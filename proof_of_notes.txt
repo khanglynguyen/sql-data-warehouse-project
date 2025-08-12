@@ -1,0 +1,190 @@
+.Type of SQL Projects:
+
+1. Data Warehousing: "Organize, Structure, Prepare"
++ETL/ ELT Processing
++Data Architecture
++Data Integration
++Data Cleansing
++Data Load
++Data Modeling
+
+2. Exploratory Data Analysis (EDA) : "Understand Data"
++Basic Queries
++ Data Profiling
++ SImple Aggregations
++ Subquery
+
+3. Advanced Data Analytics: "Answer Business Questions"
++ Complex Queries
++ Window Functions
++ CTE
++ Sunqueries
++ Reports
+
+1. Data Warehouse
+A subject-oriented, integrated, time-variant, and non-volatile collection of data in support of management's decision-making process.
+
+-> Moving data from SOURCE to TARGET in reality is not a straightforward process, usually you need to apply multiple different variants of ETL when moving between layers in a data architecture between source and target depending on your needs.
+-> Moving from Source into a Target through a data architecture with multiple layers. For example:
+Source -> Layer1 : use EL because you want to keep the data intact.
+Layer1 -> Layer2 : use ETL to further extract and transform the data as per requirements
+Layer2 -> Layer3 : use TL only to transform the whole data in Layer2 and load it into the Layer3
+Layer3 -> Layer4: use only L because you only want to duplicate the data. Then use T inside Layer4 to transform the data further
+-------------------------------
+. Extraction methods
++ Pull Extraction or Push Extraction: the code pulling from the source, or the source is pushing the data
+. Extraction Types
++ Full Extraction or Incremental Extraction: either everyday we pull all the data from the warehouse, or everyday we only identify new data and extract it
+. Extract Techniques
++ Manual Data Extraction: someone physically accesses a source system and extracts data manually.
++ Database Querying: connecting to a database and using a query to extract the data.
++ File Parsing: data is extracted by parsing a file to the data warehouse.
++ API Calls: Writing code to connect to an API and extract data.
++ Event Based Streaming: (e.g., Kafka) data is extracted as streaming events.
++ CDC: (Change Data Capture) similar to streaming, CDC captures and delivers changes made to a database in real-time or near-real-time.
++ Web Scraping: A code runs to extract information directly from the web.
+-------------------------------
+. Transformation Techniques
++ Data Enrichment: Adding new, relevant information to datasets to enhance their value. This can involve combining data from multiple sources or deriving new attributes.
++ Data Integration: Merging data from multiple source systems into a single, unified data model or dataset. This is particularly important for providing a holistic view from disparate sources
++ Derived Columns: Creating new columns based on calculations or transformations of existing ones (e.g., splitting a product key into category ID and product number).
++ Data Normalization and Standardization: Mapping coded or abbreviated values to more meaningful, user-friendly descriptions (e.g., converting 'F' to 'Female' or 'D' to 'Germany').
++ Business Rules and Logic: Applying specific business criteria and formulas to the data (e.g., ensuring sales = quantity * price or defining how to handle historical data).
++ Data Aggregations: Summarizing data to a different granularity (e.g., summing sales by month or product category).
+
++ Data Cleansing: this is a critical process to fix data quality issues and ensure consistency. It includes:
+▪ Removing Duplicates: Identifying and retaining only the most relevant record for each primary key to ensure uniqueness.
+Data Filtering: Selecting specific data based on criteria, often used in conjunction with removing duplicates.
+▪ Handling Missing Data: Filling blanks or nulls by adding default values (e.g., replacing nulls with 'Not Available' or 'Unknown', or zero for numerical fields).
+▪ Handling Invalid Values/Data: Correcting or removing data that does not conform to expected patterns or ranges (e.g., future birthdates, negative costs, or incorrect numerical representations of dates).
+▪ Removing Unwanted Spaces/Trimming: Eliminating leading or trailing spaces from string values to ensure consistency.
+▪ Detecting Outliers: Identifying and managing data points that significantly deviate from the majority.
+▪ Casting Data Types: Converting data from one type to another (e.g., from integer to date, or specifying NVARCHAR lengths)
+-------------------------------
+
+. Processing Types: How frequently and in what manner data is processed for loading into the data warehouse.
+- Batch Processing: Loading the data warehouse in one large batch of data. Typically run as a one-time job designed to refresh the entire data warehouse and its associated reports. Usually Scheduled, e.g twice a day.
+- Stream Processing: In contrast, aim to process data as soon as a change occurs in the source system. The primary goal is to achieve a real-time data warehouse, meaning data is proccessed through all layers as soon as it changes at the source <- much more challenging to implement in data warehousing projects.
+
+. Load Methods: Refer to the specific ways in which data is inserted or update within the data warehouse tables, often applied within the context of a chosen processing type.
+- Full Load: All records from the tables are loaded every day. Involve refreshing the entire content of a table by first emptying it and then inserting all the data from the source.
++ Truncate & Insert: involve making the table completely empty using a TRUNCATE TABLE command and then inserting all the data from scratch. For efficient loading of large amounts of data from files (like CSVs) into the database in one operation, rather than row by row, the BULK INSERT statement is employed.
++ Upert: update insert, to update existing records and inserts new ones.
++ Drop, Create, Insert: involve dropping the entire table, recreating it from scratch, and then inserting the data. It is very similar to TRUNCATE but also removes and redefines the table structure.
+- Incremental Load: is a smarter approach where only the new or changed data is identified, extracted, and then loaded. This method avoids loading the entire dataset daily.
++ Upsert: update and insert. Similar to full load upsert, involve updating existing records and inserting new ones into the tables.
++ Append: only insert. For sources that behave like logs, data can simply be appended to the table without needing updates.
++ Merge: update, insert and delete. Kind of similar to upsert but also includes the functionaility to delete records.
+
+. Slowly Changing Dimensions (SCD - How to handle historical data):
++ SCD Type 0 (SCD0 - No Historization): means nothing should be changed at all once data enters the data warehouse. Records are not updated.
++ SCD Type 1 (SCD1 - Overwrite): involve overwriting existing records with new info from the source system. While it updates the records, it means that the historical data is lost because the old values are replaced by the new ones.
++ SCD Type 2 (SCD2 - Add Historization): add historization to a table. For each change received from the source system, new records are inserted. The old data is not overwritten or deleted, instead it is marked as inactive, and the newly inserted record becomes the active one, preserving a complete history of changes over time.
+
+-------------------------------
+Data Architectures options:
+. Data Warehouse
+. Data Lake
+. Data Lakehouse (most modern approach)
+. Data Mesh (decentralized data structure)
+
+Data Warehouse:
++First type of approach: Inmon
+(Source) -> Stage -> EDW (enterprised data warehouse - using 3NF) -> Data Marts -> (Reporting or Analysis)
+
++Second type of approach: Kimbaff
+(Source) -> Stage -> (skipped EDW) Data Marts -> (Reporting or Analysis)
+
++Third type of approach: Data Vault
+(Source) -> Stage -> (splitted EDW) Raw Vault -> Business Vault -> Data Marts -> (Reporting or Analysis)
+
++Fourth type of approach: Medallion Architecture
+(Source) -> Bronze -> Silver -> Gold -> (Reporting or Analysis)
+
+Medallion Architecture approach:
++Bronze Layer: (def) Raw, unprocessed data as-is from sources. (obj) Traceability & Debugging. (obj type) Tables. (Load Method) Truncate & Insert. (Data Transformation) None (as-is). (Data Modelling) None (as-is). (Target Audience) Data Engineers.
++Silver Layer: (def) Clean & standardrized data . (obj) (Intermediate Layer) Prepare Data for Analysis. (obj type) Tables. (Load Method) Truncate & Insert. (Data Transformation) Data Cleaning, Data Standardrization, Data Normalization, Derived Columns, Data Enrichment. (Data Modelling) None (as-is). (Target Audience) Data Analysists, Data Engineers.
++Gold Layer: (def) Business-Ready data. (obj) Provide data to be consumed for reporting & Analytics. (obj type) Views. (Load Method)
+None. (Data Transformation) Data Integration, Data Aggregation, Business Logic & Rules. (Data Modelling) Star Schema, Aggregated objects, Flat Tables. (Target Audience) Data Analysists, Business Users.
+
+Mindset for Data Engineers: Separation of Concern
+
+---
+Naming Conventions: Set of Rules or Guidelines for naming anything in the project (Database, Schema, Tables, Store Procedures)
+1 SCREAMING_SNAKE_CASE
+2 kebab-case
+3 camelCase
+4 snake_case
+
+-> For Table naming in SQL database, follow these principles: use snake_case naming convention, use English for all names, do not use SQL reserved words as object names (e.g not naming a table "Table")
+--> Bronze rules:
+. All names must start with the source system name, and table names must match their original names without renaming.
+. <sourcesystem>_<entity> (e.g crm_customer_info - customer information from the CRM system)
+--> Silver rules:
+. All names must start with the source system name, and table names must match their original names without renaming.
+. <sourcesystem>_<entity> (e.g crm_customer_info - customer information from the CRM system)
+--> Gold rules:
+. All names must use meaningful, business-aligned names for tables, starting with the category prefix.
+. <category>_<entity> (e.g dim_customer - dimension table for customer data, fact_sales - fact table containing sales transactions, agg_customers - aggregated table containing customers data)
+
+-> For Column naming in SQL database
+--> Surrogate Keys:
+. All primary keys in dimension tables must use the suffix "_key".
+. <table_name>_key (e.g customer_key - surrogate key in the dim_customer table)
+--> Technical Columns:
+. All technical columns must start with the prefix "dwh_" which is exclusively for system-generated metadata, followed by a descriptive name indicating the column's purpose.
+. dwh_<column_name> (e.g dwh_load_data - system-generated column used to store the data when the record was loaded)
+
+-> For Stored Procedure naming in SQL database
+. All stored procedures used for loading data must follow the naming pattern:
+. load_<layer> (e.g load_silver - stored procedure for loading data into the Silver layer)
+
+-----------
+Create Database 'DataWarehouse'
+"GO": separate batches when working with multiple SQL statements.
+-----------
+CREATE BRONZE LAYER
+1. Analysing: Source Systems
+- Interview Source System Experts
++ Business Context & Ownership
+"Who owns the data?"
+"What Business Process it supports?": include Customer transactions, Supply chain logistics and Finance reporting. This helps in understanding the importance of your data.
+"System & Data documentation": your learning material about the data. This can save a lot of time later when designing new data models.
+"Data Model & Data Catalog": a data catalog with descriptions of columns and tables is very helpful for understanding how to join tables in the data warehouse.
+
++ Architecture & Technology Stack (General Technical questions)
+"What is data stored? (SQL Servers, Oracle, AWS, Azure,...)": helps determine the appropriate connection methods and tools needed for extraction.
+"How are the integration capabilities? (API, Kafka, File Extract, Direct DB, ...)": focus on how data can be extracted from the source system and dictate the mechanism for data ingestion.
+
++ Extract & Load (In-depth Technical questions)
+"Incremental vs. Full Loads?": determine if the data can be loaded incrementally (only new or changed data) or if a full load (reloading all data each time).
+"Data Scope & Historical Needs": clarify if all historical data is required, or only a specific period. It also investigates if historical data is already managed within the source system or if it needs to be built into the data warehouse.
+"What is the expected size of the extracts?": understand the volume of data (mbs,gbs,tbs) to select the appropriate tools and platforms for connecting to the source system as well as handle the data volume.
+"Are there any data volume limitations?": identify any limitations of older source systems that might struggle with performance when large amounts of data are extracted. 
+"How to avoid impacting the source system's performance?"
+" Authentication & Authorization (tokens, SSH keys, VPN, IP whitelisting, ...)": how to securely access the data in the source system.
+
+2. Coding: Data Ingestion
+"Data Profilling": Explore the data to identify column names and data types.
+- Create SQL DDL scripts for ALL CSV files
+
+- Develop SQL Load Scripts
++Full Loads by: use TRUNCATE which can quickly delete all rows from a table, resetting it to an empty state. Then use BULK INSERT.
+-> save frequently used SQL code in stored procedures in database.
++ Quality Check: Check that the data has not shifted and is in the correct columns.
+-> add Print to track execution, debug issues, and understand its flow
+-> SQL runs the TRY block, and if it fails, it runs the CATCH block to handle the error
+-> Tracking ETL duration helps to identify bottlenecks, optimize performance, monitor trends, detect issues.
+
+3. Validating: Data Completeness & Schema Checks
+
+4. Document: Draw Data Flow (Draw.io)
+
+-----------
+CREATE SILVER LAYER
+1. Analysing: Explore & Understand the Data
+
+2. Coding: Data Cleansing
+- Check Quality of Bronze
+- Write Data Transformation
+- Insert into Silver
