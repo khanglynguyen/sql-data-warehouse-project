@@ -10,8 +10,8 @@ prd_end_dt
 )
 SELECT
 prd_id,
-REPLACE(SUBSTRING(prd_key, 1, 5), '-', '_') AS cat_id,
-SUBSTRING(prd_key, 7, LEN(prd_key)) AS prd_key,
+REPLACE(SUBSTRING(prd_key, 1, 5), '-', '_') AS cat_id, -- Extract category ID for joining table
+SUBSTRING(prd_key, 7, LEN(prd_key)) AS prd_key, -- Extract product key for joining table
 prd_nm,
 ISNULL(prd_cost, 0) AS prd_cost,
 CASE UPPER(TRIM(prd_line))
@@ -22,5 +22,5 @@ CASE UPPER(TRIM(prd_line))
 	ELSE 'n/a'
 END AS prd_line,
 prd_start_dt,
-LEAD(DATEADD(day, -1, prd_start_dt)) OVER (PARTITION BY prd_key ORDER BY prd_start_dt) AS prd_end_dt
+LEAD(DATEADD(day, -1, prd_start_dt)) OVER (PARTITION BY prd_key ORDER BY prd_start_dt) AS prd_end_dt -- Take the next start date as end date
 FROM bronze.crm_prd_info
