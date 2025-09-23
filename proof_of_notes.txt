@@ -148,23 +148,28 @@ BEGIN
     DROP DATABASE DataWarehouse;"
 -> SELECT 1: instead of selecting actual data (like "name" or "database_id"), we SELECT 1 which is a common optimization. We don't care about what is returned, only check for its existence when compared with WHERE name = '...'
 -----------
-                                            Bronze Layer                                       Silver Layer                               Gold Layer
-Data Type                     Raw, unprocessed data                  Clean & standardized data           Business-Ready data
-                                          as-is from sources
-Objective                      Traceability & Debugging                   (Intermediate Layer)              Provide data to be consumed
-                                                                                             Prepare Data for Analysis             for reporting & Analytics
-Object Type                           Tables                                                  Tables                                          Views
-Load Method                       Full Load                                             Full Load                                       None
-                                        (Truncate & Insert)                            (Truncate & Insert)
-                                                                                                  - Data Cleaning                             - Data Integration
-                                                                                                  - Data Standardization                  - Data Aggregation
-Data Transformation             None (as-is)                                 - Derived Columns                        - Business Logic & Rules
-                                                                                                  - Data Enrichment
-                                                                                                                                                        - Star Schema
-Data Modeling                      None (as-is)                                 None (as-is)                                  - Aggregated Objects
-                                                                                                                                                        - Flat Tables
-Target Audience                 - Data Engineers                             - Data Analysis                              - Data Analysis
-                                                                                                   - Data Engineers                           - Business Users
+                                        Bronze Layer                           Silver Layer                               Gold Layer
+Data Type                     		Raw, unprocessed data                  Clean & standardized data                 Business-Ready data
+                                       as-is from sources
+
+Objective                          Traceability & Debugging                  (Intermediate Layer)                Provide data to be consumed
+                                                                            Prepare Data for Analysis             for reporting & Analytics
+
+Object Type                                Tables                                  Tables                                    Views
+Load Method                               Full Load                               Full Load                                  None
+                                      (Truncate & Insert)                     (Truncate & Insert)
+
+                                                                              - Data Cleaning                         - Data Integration
+                                                                              - Data Standardization                  - Data Aggregation
+Data Transformation                      None (as-is)                         - Derived Columns                       - Business Logic & Rules
+                                                                              - Data Enrichment
+
+                                                                                                                          - Star Schema
+Data Modeling                            None (as-is)                            None (as-is)                             - Aggregated Objects
+                                                                                                                          - Flat Tables
+
+Target Audience                        - Data Engineers                          - Data Analysis                          - Data Analysis
+                                                                                 - Data Engineers                         - Business Users
 
 -----------
 CREATE BRONZE LAYER
