@@ -148,6 +148,25 @@ BEGIN
     DROP DATABASE DataWarehouse;"
 -> SELECT 1: instead of selecting actual data (like "name" or "database_id"), we SELECT 1 which is a common optimization. We don't care about what is returned, only check for its existence when compared with WHERE name = '...'
 -----------
+                                            Bronze Layer                                       Silver Layer                               Gold Layer
+Data Type                     Raw, unprocessed data                  Clean & standardized data           Business-Ready data
+                                          as-is from sources
+Objective                      Traceability & Debugging                   (Intermediate Layer)              Provide data to be consumed
+                                                                                             Prepare Data for Analysis             for reporting & Analytics
+Object Type                           Tables                                                  Tables                                          Views
+Load Method                       Full Load                                             Full Load                                       None
+                                        (Truncate & Insert)                            (Truncate & Insert)
+                                                                                                  - Data Cleaning                             - Data Integration
+                                                                                                  - Data Standardization                  - Data Aggregation
+Data Transformation             None (as-is)                                 - Derived Columns                        - Business Logic & Rules
+                                                                                                  - Data Enrichment
+                                                                                                                                                        - Star Schema
+Data Modeling                      None (as-is)                                 None (as-is)                                  - Aggregated Objects
+                                                                                                                                                        - Flat Tables
+Target Audience                 - Data Engineers                             - Data Analysis                              - Data Analysis
+                                                                                                   - Data Engineers                           - Business Users
+
+-----------
 CREATE BRONZE LAYER
 1. Analysing: Source Systems
 - Interview Source System Experts
@@ -511,6 +530,114 @@ WHERE sls_order_dt > sls_ship_dt OR sls_order_dt > sls_due_dt
 -- Final Check for everything
 SELECT * FROM silver.crm_sales_details
 
--- LOAD&CLEAN crm_sales_details
+-- LOAD&CLEAN erp_cust_az12
 + Check cid
+-> After transformation, check if there are any mismatched data
+SELECT
+CASE WHEN cid LIKE 'NAS%' 
+	THEN SUBSTRING(cid,4,LEN(cid))
+	ELSE cid
+END AS cid,
+bdate,
+gen
+FROM bronze.erp_cust_az12
+--WHERE cid LIKE '%AW00011000%'
+WHERE CASE WHEN cid LIKE 'NAS%' 
+	THEN SUBSTRING(cid,4,LEN(cid))
+	ELSE cid 
+END
+	NOT IN 
+(SELECT cst_key FROM silver.crm_cust_info)
+
++ Check bdate
+-> Check for very old customers, and bdate in the future
+SELECT DISTINCT
+bdate
+FROM bronze.erp_cust_az12
+WHERE bdate > GETDATE() OR bdate < '1924-01-01'
+
+++ Quality Check
+-- Identify Out-of-Range Dates
+SELECT DISTINCT
+bdate
+FROM silver.erp_cust_az12
+WHERE bdate > GETDATE()
+
+SELECT DISTINCT
+gen,
+CASE WHEN UPPER(TRIM(gen)) IN ('F', 'FEMALE') THEN 'Female'
+	 WHEN UPPER(TRIM(gen)) IN ('M', 'MALE') THEN 'Male'
+	ELSE 'n/a'
+END AS gen
+FROM silver.erp_cust_az12
+
+SELECT DISTINCT cid FROM silver.erp_cust_az12
+
+SELECT * FROM silver.erp_cust_az12 ORDER BY gen
+
+-- LOAD&CLEAN erp_loc_a101
++ Check cid
+REPLACE(cid, '-','') AS cid
+
++ Check cntry
+CASE WHEN UPPER(TRIM(cntry)) IN ('DE','GERMANY') THEN 'Germany'
+	 WHEN UPPER(TRIM(cntry)) IN ('USA','US','UNITED STATES') THEN 'United States'
+	 WHEN UPPER(TRIM(cntry)) = '' OR cntry IS NULL THEN 'n/a'
+	ELSE TRIM(cntry)
+END AS cntry
+
++ Quality Check of Silver table
+-- Data Standardization & Consistency
+SELECT DISTINCT cntry
+FROM silver.erp_loc_a101
+ORDER BY cntry
+
+SELECT * FROM silver.erp_loc_a101
+
+-- LOAD&CLEAN erp_px_cat_g1v2
++ Check id
+--> Everything is good to go
+
+-- DOCUMENT: Data Flow
+
+-----------
+CREATE GOLD LAYER
+-> Analysing: Explore & Understand the Business Objects
+-> Coding: Data Integration 
+ --> Build the Business Object
+ --> Choose Type (Dimension vs Fact)
+ --> Rename to friendly names
+-> Validating: Data Integration Checks
+-> Docs & Version: Documenting Versioning in GIT
+
+- Theory: What is Data Modeling?
+-> Taking raw and unorganized data from source to organize and structure them in a meaningful way (For example, put data into specific objects such as customers, products, sales then describe relationships between them) - e.g creating Logical Data Model
+
+-> Three different stages: three different ways on how to draw a data model
+ --> First stage: Conceptual Data Model
+Focus only on the entity (Customers, Products, Orders) and don't go into details at all - e.g don't specify any columns or attributes inside these entities, only focus on the entities that we have as well as the relationship between them -> Give the BIG PICTURE.
+
+ --> Second stage: Conceptual Data Model
+Start specifying what are the different columns that we can find in each entity (For example, CustID First_Name Last_Name for Customers, OrderID CustID ProdID Order_Date Sales for Orders, Name Category for Products). As well as clearly marking the relationship between these  different columns from each entity, and which is the primary key respectively. -> More DETAILS, but still hasn't worried about how to store these tables in the database.
+
+ --> Third stage: Physical Data Model
+Where everything gets ready before creating it in the database like adding for each column the data types and the length of each data types and many other database techniques and details (e.g: CustID: Integer First_name: Varchar(20) Last_Name: Varchar(20) for Customers) -> IMPLEMENTATION
+
+- Theory: Star Schema vs. Snowflake Schema
+-> Optimized Data Model that is suitable for reporting and analyticsc and it should be flexible and scalable as well as easy to understand.
+
+--> Star Schema: It has a central Fact table in the middle and surrounded by Dimension tables. Fac table contains transactional events and dimension tables contain descriptive information
+--> Snowflake Schema: It has a central Fact table in the middle and surrounded by Dimension tables, similar to Star Schema. But the big difference is that we break the Dimensions into Subdimensions, e.g the surrounding dimension tables have relationships with its other dimension tables, creating a snowflake shape.
+
+- Theory: Dimensions vs Facts
+--> Dimension: Descriptive Information that give context to your data. (product info: product names, categories, subcategories)
+-> Who? What? Where?
+ 
+--> Fact: Quantitative information that represents events. (multiple products, dates, numbers - altogether in one table)
+-> How much? How many?
+
+BUILD GOLD LAYER
+- Explore the Business Objects
+a
+
 
