@@ -148,28 +148,23 @@ BEGIN
     DROP DATABASE DataWarehouse;"
 -> SELECT 1: instead of selecting actual data (like "name" or "database_id"), we SELECT 1 which is a common optimization. We don't care about what is returned, only check for its existence when compared with WHERE name = '...'
 -----------
-                                        Bronze Layer                           Silver Layer                               Gold Layer
-Data Type                     		Raw, unprocessed data                  Clean & standardized data                 Business-Ready data
-                                       as-is from sources
-
-Objective                          Traceability & Debugging                  (Intermediate Layer)                Provide data to be consumed
-                                                                            Prepare Data for Analysis             for reporting & Analytics
-
-Object Type                                Tables                                  Tables                                    Views
-Load Method                               Full Load                               Full Load                                  None
-                                      (Truncate & Insert)                     (Truncate & Insert)
-
-                                                                              - Data Cleaning                         - Data Integration
-                                                                              - Data Standardization                  - Data Aggregation
-Data Transformation                      None (as-is)                         - Derived Columns                       - Business Logic & Rules
-                                                                              - Data Enrichment
-
-                                                                                                                          - Star Schema
-Data Modeling                            None (as-is)                            None (as-is)                             - Aggregated Objects
-                                                                                                                          - Flat Tables
-
-Target Audience                        - Data Engineers                          - Data Analysis                          - Data Analysis
-                                                                                 - Data Engineers                         - Business Users
+                                            Bronze Layer                                       Silver Layer                               Gold Layer
+Data Type                     Raw, unprocessed data                  Clean & standardized data           Business-Ready data
+                                          as-is from sources
+Objective                      Traceability & Debugging                   (Intermediate Layer)              Provide data to be consumed
+                                                                                             Prepare Data for Analysis             for reporting & Analytics
+Object Type                           Tables                                                  Tables                                          Views
+Load Method                       Full Load                                             Full Load                                       None
+                                        (Truncate & Insert)                            (Truncate & Insert)
+                                                                                                  - Data Cleaning                             - Data Integration
+                                                                                                  - Data Standardization                  - Data Aggregation
+Data Transformation             None (as-is)                                 - Derived Columns                        - Business Logic & Rules
+                                                                                                  - Data Enrichment
+                                                                                                                                                        - Star Schema
+Data Modeling                      None (as-is)                                 None (as-is)                                  - Aggregated Objects
+                                                                                                                                                        - Flat Tables
+Target Audience                 - Data Engineers                             - Data Analysis                              - Data Analysis
+                                                                                                   - Data Engineers                           - Business Users
 
 -----------
 CREATE BRONZE LAYER
@@ -643,6 +638,146 @@ Where everything gets ready before creating it in the database like adding for e
 
 BUILD GOLD LAYER
 - Explore the Business Objects
-a
+
+- Coding: Data Integration
+-->INNER JOIN returns only matching rows from both tables, while OUTER JOIN includes unmatched rows, with NULLs filling gaps when no corresponding data is found
+
+--> FROM: Master table -> LEFT JOIN: Table A
+                                       -> LEFT JOIN: Table B
+-> This will include all the customer entries from the master table
++ Build Customer Table in Gold Layer
+SELECT
+ci.cst_id,
+ci.cst_key,
+ci.cst_firstname,
+ci.cst_lastname,
+ci.cst_marital_status,
+ci.cst_gndr,
+ci.cst_create_date,
+ca.bdate,
+ca.gen,
+la.cntry
+FROM silver.crm_cust_info ci
+LEFT JOIN silver.erp_cust_az12 ca
+ON	      ci.cst_key = ca.cid
+LEFT JOIN silver.erp_loc_a101 la
+ON		  ci.cst_key = la.cid
+
+--> After Joining table, check if any duplicates were introduced by the join logic
+-> Use COUNT, GROUP BY to check for duplicates in the primary key
+SELECT cst_id, COUNT(*) FROM
+(...) t GROUP BY cst_id
+HAVING COUNT(*) > 1
+
+--> Problem with ci.cst_gndr and ca.gen as redundancy happends
+-> We have to perform Data Integration
+st_gndr,
+ca.gen
+FROM silver.crm_cust_info ci
+LEFT JOIN silver.erp_cust_az12 ca
+ON	      ci.cst_key = ca.cid
+LEFT JOIN silver.erp_loc_a101 la
+ON		  ci.cst_key = la.cid
+ORDER BY 1,2
+-> Ask the question of which source is the master for these values?
+SELECT DISTINCT
+ci.cst_gndr,
+ca.gen,
+CASE WHEN ci.cst_gndr != 'n/a' THEN ci.cst_gndr -- CRM is the Master for Gender Info
+	 ELSE COALESCE(ca.gen, 'n/a')
+END AS new_gen
+FROM silver.crm_cust_info ci
+LEFT JOIN silver.erp_cust_az12 ca
+ON	      ci.cst_key = ca.cid
+LEFT JOIN silver.erp_loc_a101 la
+ON		  ci.cst_key = la.cid
+ORDER BY 1,2
+-> COALESCE (expression1,expression2,expression3) is meant to act as a search engine that search for non-NULL value. It checks expression1 first, if it was non-NULL it stopped and returned expression1 without looking at the others. If expression1 and expression2 was NULL, it would look to expressions3 which is usually an intended value-not a column of data- so that it would return that expressions3 if the other columns were NULL.
+-> Aggregate and transform 2 columns into a new one, which is Data Integration
+
+- Rename columns to friendly, meaningful names (Specifically for Gold Layer)
+--> In this case, we use snake_case
+
+- Sort the columns into logical groups to improve readability (Specifically for Gold Layer)
+
+- Which one, Dim or Fact?
+--> In this case, we are making a Dim Customer table
+-> Every Dim table needs a primary key
+-> You can either use the already existing primary key, or generate a new primary key if there are no dependable options - which is called surrogate key
+--> Surrogate key is a system-generated unique identifier assigned to each record in a table to make the record unique. It is not a business key, it has no meaning and no one in the business knows about it. We only use it in order to connect our data model -> In this way we have more control on how to connect our data model and we don't have to always depend on the source system. Many ways include:
+-> DDL-based generation
+-> Query-based using Window function (Row_Number)
+
+- Create the Object
+As we decided that all the objects in the gold layer are going to be virtual ones -that means we are going to create a view-
+
++ Build Product Table in Gold Layer
+-> From silver.crm_prd_info
+-> Depends on the requirements (e.g if we need to perform analysis), however we're only sticking with the current information
+-> Using product key, not the primary key. Therefore we need to filter out the historical data and stay only with the current data
+--> Target the End Date, if End Date is NULL then it is current info of the product
+--> HAVING clause is used to filter groups of rows based on conditions applied to aggregate functions. It is applied after the GROUP BY clause, meaning it operates on the aggregated results. Conditions in HAVING typically involve aggregate functions like SUM(), COUNT(), AVG(), MIN(), or MAX()
+--> CASE WHEN statement is used to implement conditional logic within a query, allowing different values to be returned based on specified conditions. It can be used in SELECT, WHERE, ORDER BY, and GROUP BY clauses, and it operates on individual rows or values. CASE WHEN evaluates conditions sequentially, returning the value associated with the first true condition.
+
+-> prd_id is the primary key, prd_key will be the surrogate key to connect with other data models
+
+SELECT
+	ROW_NUMBER() OVER (ORDER BY pn.prd_start_dt, pn.prd_key) AS product_key,
+	pn.prd_id AS product_id, -- Good
+	pn.prd_key AS product_number,
+	pn.prd_nm AS product_name,
+	pn.cat_id AS category_id, -- Join Table
+	pc.cat AS category,
+	pc.subcat AS subcategory,
+	pc.maintenance,
+	pn.prd_cost AS cost, -- Good
+	pn.prd_line AS product_line, -- Good
+	pn.prd_start_dt AS start_date
+FROM silver.crm_prd_info pn
+LEFT JOIN silver.erp_px_cat_g1v2 pc
+ON pn.cat_id = pc.id
+WHERE prd_end_dt IS NULL -- Filter out all historical data
+
+
++ Create Fact Sales in Gold Layer
+Using silver.crm_sales_details
+-> (sls_ord_num, sls_prd_key, sls_cust_id) are KEYS
+-> (sls_order_dt, sls_ship_dt, sls_due_dt) are DATES
+-> (sls_sales, sls_quantity, sls_price) are MEASURES
+--> This is a FACT table
+
+-> Alot of IDs so it is connecting with multiple dimensions, therefore we need to represent surrogate keys that come from the dimensions table.
+--> Building Fact: Use the dimension's surrogate keys instead of IDs to easily connect fact with dimensions.
+--> Performing Data Lookup - which is joining tables in order only to get one information ->also use LEFT JOIN
+
+SELECT
+sd.sls_ord_num AS order_number,
+pr.product_key, -- surrogate key from dim_products
+cs.customer_key, -- surrogate key from dim_customers
+sd.sls_order_dt AS order_date,
+sd.sls_ship_dt AS shipping_date,
+sd.sls_due_dt AS due_date,
+sd.sls_sales AS sales_amount,
+sd.sls_quantity AS quantity,
+sd.sls_price AS price
+FROM silver.crm_sales_details sd
+LEFT JOIN gold.dim_products pr
+ON sd.sls_prd_key = pr.product_number
+LEFT JOIN gold.dim_customers cs
+ON sd.sls_cust_id = cs.customer_id
+
++ Fact Check
+Check if all dimension tables can successfully join to the fact table
+
+-> with dimension table gold.dim_customers and with dimension table gold.dim_products
+
+-- Foreign Key Integrity (Dimensions)
+SELECT * FROM gold.fact_sales fs
+LEFT JOIN gold.dim_customers dc
+ON fs.customer_key = dc.customer_key
+LEFT JOIN gold.dim_products dp
+ON fs.product_key = dp.product_key
+WHERE dp.product_key IS NULL -- Check if all dimension tables can succesfully join to the fact table
+
 
 
