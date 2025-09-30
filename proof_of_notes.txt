@@ -766,7 +766,7 @@ ON sd.sls_prd_key = pr.product_number
 LEFT JOIN gold.dim_customers cs
 ON sd.sls_cust_id = cs.customer_id
 
-+ Fact Check
++ Fact Check for Fact table
 Check if all dimension tables can successfully join to the fact table
 
 -> with dimension table gold.dim_customers and with dimension table gold.dim_products
